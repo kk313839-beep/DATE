@@ -15,9 +15,46 @@
             overflow: hidden;
         }
         .modal-active { overflow: hidden; }
+        
+        /* 音樂旋轉動畫 */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin-slow {
+            animation: spin 6s linear infinite;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
+
+    <!-- 背景音樂播放器 (隱藏) -->
+    <div id="bgMusicContainer" class="hidden">
+        <div id="youtubePlayer"></div>
+    </div>
+
+    <!-- 音樂控制懸浮按鈕 -->
+    <button id="musicToggle" class="fixed bottom-6 right-6 z-40 bg-white p-3 rounded-full shadow-2xl border border-gray-100 flex items-center justify-center hover:scale-110 transition-transform group">
+        <div id="musicIconContainer" class="relative">
+            <svg id="musicIconPlay" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-600"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            <svg id="musicIconPause" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400 hidden"><rect width="4" height="16" x="6" y="4" rx="1"/><rect width="4" height="16" x="14" y="4" rx="1"/></svg>
+        </div>
+        <span class="absolute right-full mr-3 bg-gray-800 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">背景音樂控制</span>
+    </button>
+
+    <!-- 啟動進入視窗 (為了繞過瀏覽器自動播放限制) -->
+    <div id="welcomeOverlay" class="fixed inset-0 z-[100] bg-indigo-600 flex items-center justify-center text-white p-6">
+        <div class="max-w-md text-center">
+            <div class="bg-white/20 p-6 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6 animate-pulse">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a3 3 0 0 0-3-3H5a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3V8Z"/><path d="M10 12h.01"/><path d="M16 16h.01"/><path d="M7 8v8"/><path d="M12 8v8"/><path d="M17 8v8"/></svg>
+            </div>
+            <h2 class="text-3xl font-bold mb-4">歡迎來到教案資料庫</h2>
+            <p class="text-indigo-100 mb-8 leading-relaxed">我們為您準備了輕快的背景音樂輔助學習。<br>點擊下方按鈕開始體驗。</p>
+            <button onclick="startExperience()" class="bg-white text-indigo-600 px-10 py-4 rounded-full font-bold text-lg shadow-xl hover:bg-indigo-50 transition-colors active:scale-95">
+                開始瀏覽
+            </button>
+        </div>
+    </div>
 
     <!-- Header -->
     <header class="bg-white border-b sticky top-0 z-30 shadow-sm">
@@ -142,6 +179,9 @@
         </div>
     </footer>
 
+    <!-- YouTube API Script -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+
     <script>
         const LESSON_PLANS = [
             {
@@ -193,6 +233,71 @@
 
         let currentCategory = '全部';
         let searchQuery = '';
+        let bgPlayer;
+        let isMusicPlaying = false;
+
+        // 背景音樂 YouTube API 初始化
+        function onYouTubeIframeAPIReady() {
+            bgPlayer = new YT.Player('youtubePlayer', {
+                height: '0',
+                width: '0',
+                videoId: 'Li5lmsEOMkM',
+                playerVars: {
+                    'autoplay': 0,
+                    'controls': 0,
+                    'loop': 1,
+                    'playlist': 'Li5lmsEOMkM' // 循環播放需要指定 playlist
+                },
+                events: {
+                    'onReady': onPlayerReady
+                }
+            });
+        }
+
+        function onPlayerReady(event) {
+            // Player is ready
+        }
+
+        function startExperience() {
+            // 隱藏歡迎遮罩
+            document.getElementById('welcomeOverlay').classList.add('hidden');
+            // 開始播放音樂
+            if (bgPlayer && bgPlayer.playVideo) {
+                bgPlayer.playVideo();
+                isMusicPlaying = true;
+                updateMusicUI();
+            }
+        }
+
+        function toggleMusic() {
+            if (!bgPlayer) return;
+            
+            if (isMusicPlaying) {
+                bgPlayer.pauseVideo();
+            } else {
+                bgPlayer.playVideo();
+            }
+            isMusicPlaying = !isMusicPlaying;
+            updateMusicUI();
+        }
+
+        function updateMusicUI() {
+            const playIcon = document.getElementById('musicIconPlay');
+            const pauseIcon = document.getElementById('musicIconPause');
+            const container = document.getElementById('musicIconContainer');
+            
+            if (isMusicPlaying) {
+                playIcon.classList.remove('hidden');
+                pauseIcon.classList.add('hidden');
+                container.classList.add('animate-spin-slow');
+            } else {
+                playIcon.classList.add('hidden');
+                pauseIcon.classList.remove('hidden');
+                container.classList.remove('animate-spin-slow');
+            }
+        }
+
+        document.getElementById('musicToggle').addEventListener('click', toggleMusic);
 
         function getCategoryStyle(category) {
             const styles = {
@@ -268,6 +373,13 @@
         }
 
         function openModal(id) {
+            // 如果背景音樂正在播放，先暫停它（避免聲音重疊）
+            if (isMusicPlaying && bgPlayer && bgPlayer.pauseVideo) {
+                bgPlayer.pauseVideo();
+                isMusicPlaying = false;
+                updateMusicUI();
+            }
+
             const plan = LESSON_PLANS.find(p => p.id === id);
             if (!plan) return;
 
@@ -292,6 +404,10 @@
             document.getElementById('modalIframe').src = "";
             modal.classList.add('hidden');
             document.body.classList.remove('modal-active');
+            
+            // 關閉影片後，可以手動選擇是否重啟背景音樂
+            // 或者這裡可以自動重啟：
+            // toggleMusic();
         }
 
         // Search event listener
